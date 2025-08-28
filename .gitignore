@@ -1,0 +1,7 @@
+.env
+app/__pycache__/
+app/data/vector_store/
+app/rag/__pycache__/
+app/services/__pycache__/
+app/utils/__pycache__/
+faiss_db/

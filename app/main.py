@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
 import os
 from dotenv import load_dotenv
 
@@ -20,8 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize services
-chat_service = ChatService()
+
+chat_service = ChatService(model_name="llama3.2:3b")
 
 class HealthResponse(BaseModel):
     status: str
@@ -37,9 +36,6 @@ async def health_check() -> HealthResponse:
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
-    """
-    Main chat endpoint that handles both rule-based flows and RAG responses
-    """
     try:
         response = await chat_service.process_message(
             user_id=request.user_id,
@@ -51,11 +47,7 @@ async def chat_endpoint(request: ChatRequest):
 
 @app.post("/ingest")
 async def ingest_data():
-    """
-    Endpoint to manually trigger data ingestion (useful for updates)
-    """
     try:
-        # Reinitialize the knowledge base
         chat_service.rag_retriever._initialize_knowledge_base()
         return {"status": "success", "message": "Data ingestion completed"}
     except Exception as e:

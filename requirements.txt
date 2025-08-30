@@ -1,12 +1,10 @@
 fastapi
 uvicorn
-langchain
-google-generativeai
-chromadb
-sentence-transformers
-python-multipart
-python-dotenv
-requests
 pydantic
+python-dotenv
+sentence-transformers
+faiss-cpu
 numpy
+google-generativeai
 langdetect
+ollama

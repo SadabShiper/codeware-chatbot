@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 
 class ChatRequest(BaseModel):
     user_id: str
@@ -11,11 +11,10 @@ class ChatResponse(BaseModel):
     triggered_flow: Optional[bool] = False
     flow_id: Optional[str] = None
 
-class FlowTriggerRequest(BaseModel):
-    user_id: str
-    trigger_id: str
-
-class FlowTriggerResponse(BaseModel):
-    success: bool
+class HealthResponse(BaseModel):
+    status: str
     message: str
-    next_step: Optional[str] = None
+
+class IngestResponse(BaseModel):
+    status: str
+    message: str

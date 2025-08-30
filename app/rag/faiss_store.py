@@ -2,6 +2,7 @@ import faiss
 import numpy as np
 import pickle
 import os
+import json
 from typing import List, Dict, Any
 from pathlib import Path
 from app.rag.embeddings import EmbeddingGenerator
@@ -67,7 +68,7 @@ class FAISSStore:
             if text_content:
                 documents.append(text_content)
                 metadatas.append({
-                    "type": item.get("type", "unknown"), 
+                    "type": "flow_item", 
                     "id": item.get("id", ""),
                     "original_data": item
                 })

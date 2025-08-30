@@ -36,6 +36,9 @@ class RAGRetriever:
         """
         Format retrieved information into context for the LLM
         """
+        if not retrieved_info:
+            return "No relevant information found in knowledge base."
+        
         context_parts = ["Relevant information from our knowledge base:"]
         
         for i, info in enumerate(retrieved_info):

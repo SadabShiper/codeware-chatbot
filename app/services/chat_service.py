@@ -1,4 +1,5 @@
 import logging
+import json
 from typing import Optional
 from app.models import ChatResponse
 from app.services.flow_service import FlowService
@@ -19,7 +20,7 @@ class ChatService:
         """
         Process user message and let LLM determine if it should trigger a flow
         """
-        # Let LLM decide if this should trigger a flow
+        # Letting LLM decide if this should trigger a flow
         flow_decision = await self._llm_flow_detection(question)
         
         if flow_decision.get("trigger_flow", False):
@@ -32,7 +33,7 @@ class ChatService:
                     flow_id=flow_id
                 )
         
-        # Use RAG with local model if no flow triggered
+        # Using RAG with local model if no flow triggered
         return await self._generate_rag_response(question)
 
     async def _llm_flow_detection(self, question: str) -> dict:

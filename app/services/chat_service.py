@@ -14,50 +14,66 @@ class ChatService:
         self.rag_retriever = RAGRetriever()
         self.model_name = model_name
 
-        # Keywords for flow triggering
-        self.trigger_keywords = {
-            "packages": ["package", "pack", "plan", "price", "মূল্য", "প্যাকেজ", "প্যাক", "প্ল্যান"],
-            "new_connection": ["new connection", "connection", "install", "setup", "নতুন সংযোগ", "কানেকশন", "ইনস্টল"],
-            "bill_pay": ["bill", "payment", "pay", "বিল", "পেমেন্ট", "পরিশোধ"],
-            "service_request": ["service", "problem", "issue", "help", "সেবা", "সমস্যা", "হেল্প"],
-            "coverage": ["coverage", "area", "location", "কভারেজ", "এলাকা", "লোকেশন"]
-        }
-
     async def process_message(self, user_id: str, question: str) -> ChatResponse:
         """
-        Process user message and determine if it should trigger a flow or use RAG
+        Process user message and let LLM determine if it should trigger a flow
         """
-        # Step 1: Check for flow triggers
-        flow_trigger = self._check_flow_trigger(question)
-        if flow_trigger:
-            logger.info(f"Flow triggered: {flow_trigger} for user: {user_id}")
-            return ChatResponse(
-                answer="Your request has been forwarded to our service team. They will contact you shortly.",
-                triggered_flow=True,
-                flow_id=flow_trigger
-            )
+        # Letting LLM decide if this should trigger a flow
+        flow_decision = await self._llm_flow_detection(question)
         
-        # Step 2: Use RAG with local model
+        if flow_decision.get("trigger_flow", False):
+            flow_id = flow_decision.get("flow_id")
+            if flow_id:
+                logger.info(f"Flow triggered: {flow_id} for user: {user_id}")
+                return ChatResponse(
+                    answer="Your request has been forwarded to our service team. They will contact you shortly.",
+                    triggered_flow=True,
+                    flow_id=flow_id
+                )
+        
+        # Using RAG with local model if no flow triggered
         return await self._generate_rag_response(question)
 
-    def _check_flow_trigger(self, question: str) -> Optional[str]:
+    async def _llm_flow_detection(self, question: str) -> dict:
         """
-        Check if the user's question matches any predefined flow triggers
+        Use LLM to determine if the question should trigger a specific flow
         """
-        question_lower = question.lower()
-        
-        for flow, keywords in self.trigger_keywords.items():
-            if any(keyword in question_lower for keyword in keywords):
-                flow_ids = {
-                    "packages": "679e564098ea05fc9dd74968_ad3734fab0d51f1a",
-                    "new_connection": "679e564098ea05fc9dd74964_5b703bf48a2b99f0",
-                    "bill_pay": "679e564098ea05fc9dd7496c_1a827ff9bcbc67a2",
-                    "service_request": "679e564098ea05fc9dd7497a_4ca15b5e495f38cd",
-                    "coverage": "679e564098ea05fc9dd7498a_9f13bae58a3a5d98"
-                }
-                return flow_ids[flow]
-        return None
-
+        try:
+            # Get all available flows for context
+            available_flows = self.flow_service.get_all_flows()
+            
+            prompt = f"""
+            Analyze the user's question and determine if it matches any of the available service flows.
+            Available flows: {available_flows}
+            
+            User question: "{question}"
+            
+            Respond with JSON only in this format:
+            {{
+                "trigger_flow": true/false,
+                "flow_id": "flow_id_string_if_applicable" OR null,
+                "confidence": 0.0-1.0,
+                "reason": "brief explanation"
+            }}
+            
+            Only trigger a flow if the user is clearly requesting a specific service like package information, 
+            new connection, bill payment, service request, or coverage check.
+            """
+            
+            response = ollama.chat(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                format="json"
+            )
+            
+            # Parse LLM response
+            decision = json.loads(response["message"]["content"])
+            return decision
+            
+        except Exception as e:
+            logger.error(f"Error in flow detection: {str(e)}")
+            return {"trigger_flow": False, "flow_id": None, "confidence": 0.0, "reason": "error"}
+    
     async def _generate_rag_response(self, question: str) -> ChatResponse:
         """
         Generate response using RAG with Ollama local model
@@ -73,7 +89,7 @@ class ChatService:
             You are a helpful customer support assistant for iDesk360, an internet service provider.
             Instructions:
 
-            1. Use the context provided below to answer the user’s question.
+            1. Use the context provided below to answer the user's question.
 
             2. If the context does not contain the answer, respond politely that you do not have that information.
 
@@ -81,7 +97,10 @@ class ChatService:
 
             4. Provide concise, clear, and helpful answers suitable for a customer support setting.
 
-            5. Include references to the sources from which you derived the answer whenever possible.
+            5. If the user is asking about specific services (packages, new connections, bill payments, 
+               service requests, or coverage), consider whether this should be handled by a specialized flow.
+               
+            6. Include references to the sources from which you derived the answer whenever possible.
             
             Context:
             {context}
@@ -104,6 +123,6 @@ class ChatService:
         except Exception as e:
             logger.error(f"Error generating RAG response: {str(e)}")
             return ChatResponse(
-                answer="I’m having some trouble answering right now. Please try again later.",
+                answer="I'm having some trouble answering right now. Please try again later.",
                 sources=[]
             )
